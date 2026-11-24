@@ -1,1 +1,745 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>لعبتي - كلمات متقاطعة</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0a0e27;
+    color: #e0e0e0;
+    font-family: 'Tahoma', 'Segoe UI', 'Arial', sans-serif;
+    direction: rtl;
+    min-height: 100vh;
+    overflow-x: hidden;
+    user-select: none;
+  }
+  .screen { display: none; min-height: 100vh; padding: 16px; }
+  .screen.active { display: block; }
 
+  /* Categories screen */
+  .title {
+    text-align: center;
+    font-size: 42px;
+    margin: 20px 0 4px;
+    color: #00e5ff;
+    text-shadow: 0 0 20px #00e5ff, 0 0 40px #00e5ff;
+    letter-spacing: 2px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #7a80a0;
+    margin: 0 0 28px;
+    font-size: 15px;
+    letter-spacing: 3px;
+  }
+  #categories-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .category-card {
+    background: linear-gradient(135deg, #141832, #1a1e40);
+    border: 2px solid #2a3060;
+    border-radius: 14px;
+    padding: 22px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .category-card:active { transform: scale(0.97); }
+  .category-card:hover { border-color: #00e5ff; box-shadow: 0 0 16px rgba(0,229,255,0.35); }
+  .category-card.solved {
+    border-color: #00ff88;
+    box-shadow: 0 0 12px rgba(0,255,136,0.25);
+  }
+  .category-card .check {
+    position: absolute;
+    top: 8px; left: 10px;
+    font-size: 20px;
+  }
+  .category-card .emoji {
+    font-size: 42px;
+    display: block;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 0 8px rgba(0,229,255,0.5));
+  }
+  .category-card .name {
+    font-size: 17px;
+    font-weight: bold;
+    color: #e0e0e0;
+  }
+
+  /* Game screen */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 4px;
+    margin-bottom: 8px;
+  }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid #2a3060;
+    color: #00e5ff;
+    font-size: 20px;
+    width: 40px; height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .icon-btn:active { background: #1a1e40; }
+  #category-name {
+    font-size: 18px;
+    font-weight: bold;
+    color: #00e5ff;
+  }
+  .spacer { width: 40px; }
+
+  #hint-bar {
+    min-height: 80px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #141832, #1a1e40);
+    border: 1px solid #2a3060;
+    border-radius: 12px;
+    margin: 0 auto 14px;
+    max-width: 400px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s;
+  }
+  #hint-bar .emoji { font-size: 26px; margin-bottom: 4px; }
+  #hint-bar .text { font-size: 14px; color: #b0b8d8; line-height: 1.4; }
+  #hint-bar .empty { color: #5a6080; font-style: italic; }
+
+  .grid-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: 0 auto 16px;
+  }
+  #grid {
+    display: grid;
+    gap: 5px;
+    width: 100%;
+    max-width: 340px;
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .cell {
+    aspect-ratio: 1;
+    background: #141832;
+    border: 2px solid #2a3060;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: #e0e0e0;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    position: relative;
+  }
+  .cell.inactive {
+    background: #060816;
+    border-color: #141a30;
+    cursor: default;
+    color: transparent;
+  }
+  .cell.selected {
+    border-color: #00e5ff;
+    background: #1a2840;
+    box-shadow: 0 0 10px rgba(0,229,255,0.4);
+  }
+  .cell.cursor {
+    border-color: #00e5ff;
+    border-width: 3px;
+    background: #1e3050;
+    box-shadow: 0 0 16px #00e5ff, inset 0 0 10px rgba(0,229,255,0.25);
+  }
+  .cell.solved {
+    background: #0d3b1e;
+    border-color: #00ff88;
+    color: #00ff88;
+    box-shadow: 0 0 8px rgba(0,255,136,0.35);
+    cursor: default;
+  }
+  .cell.wrong {
+    background: #3b0d0d;
+    border-color: #ff3860;
+    color: #ff3860;
+    box-shadow: 0 0 10px rgba(255,56,96,0.4);
+  }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  .action-btn {
+    background: linear-gradient(135deg, #1a1e40, #141832);
+    border: 2px solid #2a3060;
+    color: #e0e0e0;
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: bold;
+  }
+  .action-btn:active { transform: scale(0.96); background: #1e2450; }
+  .action-btn:hover { border-color: #00e5ff; color: #00e5ff; }
+
+  /* Hidden input */
+  #hidden-input {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 1px;
+    height: 1px;
+    opacity: 0.01;
+    border: none;
+    background: transparent;
+    color: transparent;
+    font-size: 16px;
+    padding: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /* Done screen */
+  #screen-done {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  #screen-done.active { display: flex; }
+  .done-content { max-width: 400px; }
+  .done-emoji { font-size: 80px; margin-bottom: 16px; animation: bounce 1s infinite; }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  #screen-done h2 {
+    font-size: 32px;
+    color: #00ff88;
+    text-shadow: 0 0 20px #00ff88;
+    margin: 0 0 8px;
+  }
+  #screen-done p {
+    color: #b0b8d8;
+    margin: 0 0 24px;
+    font-size: 16px;
+  }
+</style>
+</head>
+<body>
+
+<div id="screen-categories" class="screen active">
+  <h1 class="title">لعبتي</h1>
+  <p class="subtitle">كلمات متقاطعة</p>
+  <div id="categories-grid"></div>
+</div>
+
+<div id="screen-game" class="screen">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="backToCategories()" aria-label="رجوع">←</button>
+    <span id="category-name"></span>
+    <span class="spacer"></span>
+  </div>
+  <div id="hint-bar">
+    <span class="emoji"></span>
+    <span class="text empty">اضغط على أي خانة لعرض التلميح</span>
+  </div>
+  <div class="grid-wrapper">
+    <div id="grid"></div>
+  </div>
+  <div class="controls">
+    <button id="clear-btn" class="action-btn" onclick="clearCurrentChar()">مسح الحرف</button>
+  </div>
+  <input type="text" id="hidden-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+</div>
+
+<div id="screen-done">
+  <div class="done-content">
+    <div class="done-emoji">🎉</div>
+    <h2>أحسنت!</h2>
+    <p>أكملت هذه الفئة بنجاح</p>
+    <button class="action-btn" onclick="backToCategories()">رجوع للفئات</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   البيانات: 6 فئات × مستوى واحد × 5 كلمات لكل شبكة
+   ============================================================ */
+const CATEGORIES = [
+  {
+    id: "science",
+    name: "علوم",
+    emoji: "🔬",
+    words: [
+      { start: [0, 3], dir: "across", answer: "رمل",   hint: "حبيبات صغيرة توجد في الصحراء والشواطئ", emoji: "🏖️" },
+      { start: [0, 2], dir: "down",   answer: "مجرات", hint: "تجمعات هائلة من النجوم والغبار الكوني",   emoji: "🌌" },
+      { start: [2, 4], dir: "across", answer: "أجرام", hint: "أجسام تسبح في الفضاء كالكواكب والنجوم",  emoji: "🪐" },
+      { start: [2, 0], dir: "down",   answer: "ماء",   hint: "سائل الحياة، لا طعم له ولا لون",          emoji: "💧" },
+      { start: [2, 4], dir: "down",   answer: "أرض",   hint: "كوكبنا، الثالث من الشمس",                emoji: "🌍" }
+    ]
+  },
+  {
+    id: "geo",
+    name: "جغرافيا",
+    emoji: "🗺️",
+    words: [
+      { start: [0, 3], dir: "across", answer: "مصر",   hint: "بلد عربي شهير بأهراماته ونيله",           emoji: "🏛️" },
+      { start: [0, 2], dir: "down",   answer: "صحراء", hint: "أرض واسعة قليلة الماء والنبات",           emoji: "🏜️" },
+      { start: [2, 4], dir: "across", answer: "قارات", hint: "سبع مساحات تشكل اليابسة",                emoji: "🗺️" },
+      { start: [2, 0], dir: "down",   answer: "تبت",   hint: "منطقة جبلية مرتفعة في آسيا",             emoji: "🏔️" },
+      { start: [2, 4], dir: "down",   answer: "قطر",   hint: "دولة عربية خليجية استضافت كأس العالم",   emoji: "⚽" }
+    ]
+  },
+  {
+    id: "cinema",
+    name: "أفلام وسينما",
+    emoji: "🎬",
+    words: [
+      { start: [0, 3], dir: "across", answer: "أدب",   hint: "فن الكتابة، وكثير من الأفلام تُقتبس منه", emoji: "📚" },
+      { start: [0, 2], dir: "down",   answer: "دراما", hint: "نوع فني يعتمد على المشاعر والأحداث",      emoji: "🎭" },
+      { start: [2, 4], dir: "across", answer: "مشاهد", hint: "أجزاء من الفيلم تتابع الأحداث",           emoji: "🎬" },
+      { start: [2, 0], dir: "down",   answer: "دور",   hint: "شخصية يؤديها الممثل في عمل فني",         emoji: "🎭" },
+      { start: [2, 4], dir: "down",   answer: "مرح",   hint: "ما يبعث البهجة والفرح",                  emoji: "😄" }
+    ]
+  },
+  {
+    id: "cartoon",
+    name: "كرتون",
+    emoji: "📺",
+    words: [
+      { start: [0, 3], dir: "across", answer: "نمر",    hint: "حيوان مفترس بخطوط، بطل في كثير من الرسوم", emoji: "🐯" },
+      { start: [0, 2], dir: "down",   answer: "مخلوق",  hint: "كائن حي، كثيرًا ما يظهر في الكرتون",       emoji: "👾" },
+      { start: [2, 4], dir: "across", answer: "مسلسل",  hint: "سلسلة حلقات متتابعة تُعرض على التلفاز",     emoji: "📺" },
+      { start: [2, 0], dir: "down",   answer: "لعب",    hint: "نشاط ترفيهي، وجمعها الألعاب",             emoji: "🎮" },
+      { start: [2, 4], dir: "down",   answer: "ملك",    hint: "حاكم، وشخصية شائعة في القصص",             emoji: "👑" }
+    ]
+  },
+  {
+    id: "veggies",
+    name: "خضار وفاكهة",
+    emoji: "🍎",
+    words: [
+      { start: [0, 3], dir: "across", answer: "تبن",    hint: "عشب جاف يُستخدم غذاءً للحيوانات",          emoji: "🌾" },
+      { start: [0, 2], dir: "down",   answer: "بطاطس",  hint: "خضار درني، يُقلى أو يُسلق",               emoji: "🥔" },
+      { start: [2, 4], dir: "across", answer: "سبانخ",  hint: "خضار ورقي أخضر غني بالحديد",              emoji: "🥬" },
+      { start: [2, 0], dir: "down",   answer: "خوخ",    hint: "فاكهة صيفية حلوة",                        emoji: "🍑" },
+      { start: [2, 4], dir: "down",   answer: "سلق",    hint: "خضار ورقي أخضر ذو سيقان",                 emoji: "🌿" }
+    ]
+  },
+  {
+    id: "objects",
+    name: "أشياء جامدة",
+    emoji: "📦",
+    words: [
+      { start: [0, 3], dir: "across", answer: "دمى",   hint: "ألعاب على شكل بشر أو حيوانات",             emoji: "🧸" },
+      { start: [0, 2], dir: "down",   answer: "ملفات", hint: "أوراق محفوظة، وأدوات لجمع المعلومات",       emoji: "📁" },
+      { start: [2, 4], dir: "across", answer: "تلفون", hint: "جهاز للاتصال عن بُعد",                     emoji: "📱" },
+      { start: [2, 0], dir: "down",   answer: "نعل",   hint: "الجزء السفلي من الحذاء",                   emoji: "👟" },
+      { start: [2, 4], dir: "down",   answer: "تاج",   hint: "ما يلبسه الملوك على رؤوسهم",               emoji: "👑" }
+    ]
+  }
+];
+
+const SIZE = 5;
+const STORAGE_KEY = "arabicCrossword_v1";
+const ARABIC_RE = /[\u0621-\u064A]/;
+const DIACRITICS_RE = /[\u064B-\u065F\u0670]/g;
+
+/* ============================================================
+   الحالة العامة
+   ============================================================ */
+const state = {
+  categoryIndex: -1,
+  letters: {},   // "r,c" -> حرف
+  solved: {},    // categoryId -> { wordKey: true }
+  wrong: {},     // wordKey -> true
+  selectedWord: null,
+  cursorIndex: 0
+};
+
+/* ============================================================
+   دوال مساعدة
+   ============================================================ */
+function wordKey(w) {
+  return w.start[0] + "," + w.start[1] + "," + w.dir;
+}
+
+function getCells(word) {
+  const [r, c] = word.start;
+  const cells = [];
+  for (let i = 0; i < word.answer.length; i++) {
+    cells.push(word.dir === "across" ? [r, c - i] : [r + i, c]);
+  }
+  return cells;
+}
+
+function buildCellMap(words) {
+  const map = {};
+  words.forEach((w, idx) => {
+    getCells(w).forEach(([r, c]) => {
+      const key = r + "," + c;
+      (map[key] = map[key] || []).push(idx);
+    });
+  });
+  return map;
+}
+
+function currentCategory() {
+  return CATEGORIES[state.categoryIndex];
+}
+
+function isSolved(catId, word) {
+  return !!(state.solved[catId] && state.solved[catId][wordKey(word)]);
+}
+
+function isCellLocked(cat, r, c) {
+  const cellMap = buildCellMap(cat.words);
+  const idxs = cellMap[r + "," + c] || [];
+  return idxs.some(i => isSolved(cat.id, cat.words[i]));
+}
+
+/* ============================================================
+   التخزين المحلي
+   ============================================================ */
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && data.solved) state.solved = data.solved;
+    }
+  } catch (e) {}
+}
+
+function saveProgress() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ solved: state.solved }));
+  } catch (e) {}
+}
+
+/* ============================================================
+   التنقل بين الشاشات
+   ============================================================ */
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  const el = document.getElementById(id);
+  if (el) el.classList.add("active");
+}
+
+function backToCategories() {
+  const inp = document.getElementById("hidden-input");
+  if (inp) inp.blur();
+  state.selectedWord = null;
+  state.cursorIndex = 0;
+  state.letters = {};
+  state.wrong = {};
+  renderCategories();
+  showScreen("screen-categories");
+}
+
+/* ============================================================
+   شاشة الفئات
+   ============================================================ */
+function renderCategories() {
+  const grid = document.getElementById("categories-grid");
+  grid.innerHTML = "";
+  CATEGORIES.forEach((cat, idx) => {
+    const solvedSet = state.solved[cat.id] || {};
+    const allSolved = cat.words.every(w => solvedSet[wordKey(w)]);
+    const card = document.createElement("div");
+    card.className = "category-card" + (allSolved ? " solved" : "");
+    card.innerHTML =
+      (allSolved ? '<span class="check">✅</span>' : "") +
+      '<span class="emoji">' + cat.emoji + "</span>" +
+      '<span class="name">' + cat.name + "</span>";
+    card.addEventListener("click", () => startGame(idx));
+    grid.appendChild(card);
+  });
+}
+
+/* ============================================================
+   بدء اللعبة
+   ============================================================ */
+function startGame(catIdx) {
+  state.categoryIndex = catIdx;
+  state.letters = {};
+  state.wrong = {};
+  state.selectedWord = null;
+  state.cursorIndex = 0;
+
+  const cat = currentCategory();
+  const solvedSet = state.solved[cat.id] || {};
+
+  cat.words.forEach(w => {
+    if (solvedSet[wordKey(w)]) {
+      const cells = getCells(w);
+      cells.forEach(([r, c], i) => {
+        state.letters[r + "," + c] = w.answer[i];
+      });
+    }
+  });
+
+  document.getElementById("category-name").textContent = cat.emoji + " " + cat.name;
+  renderGrid();
+  updateHint();
+  showScreen("screen-game");
+}
+
+/* ============================================================
+   رسم الشبكة
+   ============================================================ */
+function renderGrid() {
+  const cat = currentCategory();
+  if (!cat) return;
+  const words = cat.words;
+  const cellMap = buildCellMap(words);
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
+  const selectedCells = new Set();
+  let cursorKey = null;
+  if (state.selectedWord) {
+    const scells = getCells(state.selectedWord);
+    scells.forEach(([r, c]) => selectedCells.add(r + "," + c));
+    if (state.cursorIndex >= 0 && state.cursorIndex < scells.length) {
+      const [cr, cc] = scells[state.cursorIndex];
+      cursorKey = cr + "," + cc;
+    }
+  }
+
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const key = r + "," + c;
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      const idxs = cellMap[key] || [];
+
+      if (idxs.length === 0) {
+        cell.classList.add("inactive");
+        grid.appendChild(cell);
+        continue;
+      }
+
+      const locked = idxs.some(i => isSolved(cat.id, words[i]));
+      const wrong = !locked && idxs.some(i => state.wrong[wordKey(words[i])]);
+      const inSelected = selectedCells.has(key);
+      const isCursor = cursorKey === key;
+
+      if (locked) cell.classList.add("solved");
+      else if (wrong) cell.classList.add("wrong");
+      else if (isCursor) cell.classList.add("cursor", "selected");
+      else if (inSelected) cell.classList.add("selected");
+
+      cell.textContent = state.letters[key] || "";
+      cell.addEventListener("click", () => onCellClick(r, c));
+      grid.appendChild(cell);
+    }
+  }
+}
+
+/* ============================================================
+   اختيار الكلمة
+   ============================================================ */
+function onCellClick(r, c) {
+  const cat = currentCategory();
+  const words = cat.words;
+  const cellMap = buildCellMap(words);
+  const key = r + "," + c;
+  const idxs = cellMap[key] || [];
+  if (idxs.length === 0) return;
+
+  const available = idxs.filter(i => !isSolved(cat.id, words[i]));
+  if (available.length === 0) return;
+
+  let nextIdx;
+  if (state.selectedWord) {
+    const currentKey = wordKey(state.selectedWord);
+    const currentIdx = available.find(i => wordKey(words[i]) === currentKey);
+    if (currentIdx !== undefined && available.length > 1) {
+      nextIdx = available.find(i => i !== currentIdx);
+    } else {
+      nextIdx = available[0];
+    }
+  } else {
+    const acrossIdx = available.find(i => words[i].dir === "across");
+    nextIdx = acrossIdx !== undefined ? acrossIdx : available[0];
+  }
+
+  state.selectedWord = words[nextIdx];
+  const cells = getCells(words[nextIdx]);
+  const clickedIdx = cells.findIndex(([rr, cc]) => rr === r && cc === c);
+  state.cursorIndex = clickedIdx >= 0 ? clickedIdx : 0;
+
+  // لو الخانة دي مقفولة (جزء من كلمة محلولة) قدم المؤشر
+  advanceCursorSkippingLocked();
+
+  updateHint();
+  renderGrid();
+  focusInput();
+}
+
+function advanceCursorSkippingLocked() {
+  const cat = currentCategory();
+  if (!cat || !state.selectedWord) return;
+  const cells = getCells(state.selectedWord);
+  while (state.cursorIndex < cells.length) {
+    const [r, c] = cells[state.cursorIndex];
+    if (!isCellLocked(cat, r, c)) break;
+    state.cursorIndex++;
+  }
+}
+
+/* ============================================================
+   تحديث شريط التلميح
+   ============================================================ */
+function updateHint() {
+  const bar = document.getElementById("hint-bar");
+  const emojiEl = bar.querySelector(".emoji");
+  const textEl = bar.querySelector(".text");
+
+  if (!state.selectedWord) {
+    emojiEl.textContent = "";
+    textEl.textContent = "اضغط على أي خانة لعرض التلميح";
+    textEl.classList.add("empty");
+    return;
+  }
+
+  textEl.classList.remove("empty");
+  emojiEl.textContent = state.selectedWord.emoji || "💡";
+  textEl.textContent = state.selectedWord.hint;
+}
+
+/* ============================================================
+   إدخال الحروف من الكيبورد
+   ============================================================ */
+function focusInput() {
+  const inp = document.getElementById("hidden-input");
+  try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); }
+}
+
+function onInput(e) {
+  const inp = e.target;
+  let raw = inp.value || "";
+  inp.value = "";
+  if (!raw) return;
+
+  let ch = raw.charAt(raw.length - 1);
+  ch = ch.replace(DIACRITICS_RE, "");
+  if (!ch || !ARABIC_RE.test(ch)) return;
+
+  if (!state.selectedWord) return;
+  const cat = currentCategory();
+  if (!cat) return;
+
+  const cells = getCells(state.selectedWord);
+
+  // تجاهل الخانات المقفولة
+  advanceCursorSkippingLocked();
+  if (state.cursorIndex >= cells.length) return;
+
+  const [r, c] = cells[state.cursorIndex];
+  const key = r + "," + c;
+  if (isCellLocked(cat, r, c)) return;
+
+  state.letters[key] = ch;
+  delete state.wrong[wordKey(state.selectedWord)];
+  state.cursorIndex++;
+
+  advanceCursorSkippingLocked();
+  checkCompletion();
+  renderGrid();
+}
+
+/* ============================================================
+   التحقق من الكلمة
+   ============================================================ */
+function checkCompletion() {
+  const cat = currentCategory();
+  if (!cat || !state.selectedWord) return;
+  const word = state.selectedWord;
+  const cells = getCells(word);
+
+  const entered = cells.map(([r, c]) => state.letters[r + "," + c] || "").join("");
+  if (entered.length !== cells.length) return;
+  if (entered.indexOf("") !== -1) return;
+
+  if (entered === word.answer) {
+    // صح
+    if (!state.solved[cat.id]) state.solved[cat.id] = {};
+    state.solved[cat.id][wordKey(word)] = true;
+    delete state.wrong[wordKey(word)];
+    saveProgress();
+
+    if (cat.words.every(w => isSolved(cat.id, w))) {
+      setTimeout(() => showScreen("screen-done"), 600);
+    }
+  } else {
+    // خطأ
+    state.wrong[wordKey(word)] = true;
+  }
+}
+
+/* ============================================================
+   مسح الحرف
+   ============================================================ */
+function clearCurrentChar() {
+  const cat = currentCategory();
+  if (!cat || !state.selectedWord) return;
+  const cells = getCells(state.selectedWord);
+
+  let idx = state.cursorIndex - 1;
+  while (idx >= 0) {
+    const [r, c] = cells[idx];
+    const key = r + "," + c;
+    if (!isCellLocked(cat, r, c) && state.letters[key]) {
+      delete state.letters[key];
+      state.cursorIndex = idx;
+      delete state.wrong[wordKey(state.selectedWord)];
+      break;
+    }
+    idx--;
+  }
+
+  renderGrid();
+  focusInput();
+}
+
+/* ============================================================
+   التهيئة
+   ============================================================ */
+function init() {
+  loadProgress();
+  renderCategories();
+  document.getElementById("hidden-input").addEventListener("input", onInput);
+}
+
+init();
+</script>
+</body>
+  </html>
